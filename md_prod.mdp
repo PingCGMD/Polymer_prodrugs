@@ -1,0 +1,47 @@
+title                = production
+
+constraints          = h-bonds
+constraint_algorithm = LINCS
+lincs_iter           = 2
+comm-mode            = LINEAR
+nstcomm              = 1
+
+integrator           = md
+dt                   = 0.002     ; ps !
+nsteps               = 500000000 ; total = 1000000 ps = 1000 ns
+
+nstxout              = 50000     ; collect data every 100 ps
+nstvout              = 50000     ; collect velocities every 100 ps
+nstlog               = 50000     ; collect energies every 100 ps in .log file
+nstxtcout            = 50000     ; collect data every 100 ps in .xtc file
+nstenergy            = 50000     ; collect energies every 100 ps in .edr file
+
+nstlist              = 10
+rlist                = 1.2
+ns_type              = grid
+pbc                  = xyz
+
+coulombtype          = PME
+pme_order            = 4
+rcoulomb             = 1.2
+ewald_rtol           = 1e-5
+fourierspacing       = 0.12
+optimize_fft         = yes
+
+vdwtype              = cut-off
+rvdw                 = 1.2
+
+tcoupl               = Nose-Hoover
+tc_grps              = non Water
+nh-chain-length      = 1
+tau_t                = 0.5 0.5
+ref_t                = 300 300
+gen_vel              = no
+gen_seed             = 173529
+gen_temp             = 300
+
+pcoupl               = Parrinello-Rahman
+pcoupltype           = isotropic
+compressibility      = 4.5e-5
+tau_p                = 2.5
+ref_p                = 1.0
