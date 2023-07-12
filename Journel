@@ -1,0 +1,153 @@
+######06/02/2020#######
+ping@jarre:~/ProDrug/GemPi1kDa/byrd03/solution/Gem24/trajectory/traj1
+gmx rms -f traj1_8.7us.xtc -s dynamic.tpr -o rmsd.xvg
+gmx trjconv -f traj1_8.7us.xtc -s dynamic.tpr -o traj1_8.7us.gro -pbc cluster
+export LD_LIBRARY_PATH="/home/ping/software/gromacs/lib:$LD_LIBRARY_PATH"
+
+
+####10.02.2020###
+ping@jarre:~/ProDrug/GemPi1kDa/byrd03/solution/Gem24/trajectory/Analysis_2.1/
+gmx trjconv -f traj2_10µs.xtc -s dynamic.tpr -tu us -b 7.0 -e 10.0 -o traj2_fin.xtc -pbc cluster
+gmx trjconv -f traj2_10µs.xtc -s dynamic.tpr -tu us -b 7.0 -e 10.0 -o traj2_fin.gro -pbc cluster
+
+gmx gyrate -s traj2_fin.gro -f traj2_fin.xtc -o gyrate2.xvg -n traj2.ndx
+
+gmx rdf -f traj2_fin.xtc -s traj2_fin.tpr -n traj2.ndx -pbc yes -selrpos whole_mol_com -seltype mol_com -bin 0.05 -o rdf_Gem.xvg 
+
+gmx rdf -f traj2_fin.xtc -s traj2_fin.tpr -n traj2.ndx -pbc yes -selrpos whole_mol_com -seltype mol_com -bin 0.05 -o rdf_Link.xvg
+
+cp rdf_Gem.xvg rdf_Gem.dat
+awk '{print ($2+$3+$4+$5+$6+$7+$8+$9+$10+$11+$12+$13+$14+$15+$16+$17+$18+$19+$20+$21+$22+$23+$24+$25)/24}' rdf_Link.dat > rdf_Link_average.dat
+awk '{print $1}' rdf_Link.dat  > rdf_Link_dist.dat
+wc -l rdf_Link_average.dat rdf_Link_dist.dat
+paste rdf_Link_dist.dat rdf_Link_average.dat > rdf_Link_dist_average.dat
+
+
+### 11.2.2020 ####
+ping@jarre:~/ProDrug/GemPi1kDa/byrd03/solution/Gem24/trajectory/traj1/
+
+gmx trjconv -f traj1_10us.xtc -s dynamic.tpr -tu us -b 7.0 -e 10 -o traj1_fin.gro -pbc cluster
+gmx convert-tpr -s dynamic.tpr -o traj1_fin.tpr
+
+gmx gyrate -s traj1_fin.gro -f traj1_fin.xtc -o gyrate.xvg -n traj1.ndx
+
+gmx rdf -f traj1_fin.gro  -s traj1_fin.tpr -n traj1.ndx -pbc yes -selrpos whole_mol_com -seltype mol_com -bin 0.05 -o rdf_Gem.xvg
+
+or
+vi Gem-----edit the reference group, like 2
+seq 30 53 >> Gem; put the calculate group in to Gem; like Gem group from 30 to 53
+cat gem | gmx rdf -f traj2_fin.xtc -s traj2_fin.tpr -n traj2.ndx -pbc yes -selrpos wh -seltype mol_com -bin 0.05 -o Gem.xvg
+
+cp rdf_Gem.xvg rdf_Gem.dat
+awk '{print ($2+$3+$4+$5+$6+$7+$8+$9+$10+$11+$12+$13+$14+$15+$16+$17+$18+$19+$20+$21+$22+$23+$24+$25))/24}' rdf_Gem.dat > rdf_Gem_average.dat
+awk '{print $1}' rdf_Gem.dat > rdf_gem_dist.dat
+wc -l  rdf_Gem_average.dat rdf_gem_dist.dat
+paste rdf_gem_dist.dat rdf_Gem_average.dat > rdf_gem_dist_average.dat
+
+edit all data:
+xmgrace -nxy radial_distribution_12.agr
+xmgrace -nxy RDF_12.agr
+
+### 12.02.2020 ###
+repeat analyze Traj2
+ping@jarre:~/ProDrug/GemPi1kDa/byrd03/solution/Gem24/trajectory/Analysis_2.1
+
+gmx trjconv -f traj2_10us.xtc -s dynamic.tpr -tu us -b 7.0 -e 10 -o traj2_fin.gro -pbc cluster
+gmx convert-tpr -s dynamic.tpr -o traj2_fin.tpr
+
+gmx gyrate -s traj2_fin.gro -f traj2_fin.xtc -o gyrate.xvg -n traj2.ndx
+gmx rdf -f traj2_fin.xtc -s traj2_fin.tpr -n traj2.ndx -pbc yes -selrpos whole_mol_com -seltype mol_com -bin 0.05 -o rdf_Gem.xvg 
+
+gmx rdf -f traj2_fin.xtc -s traj2_fin.tpr -n traj2.ndx -pbc yes -selrpos whole_mol_com -seltype mol_com -bin 0.05 -o rdf_Link.xvg
+
+gmx clustsize -f traj1_8.7us.xtc -s dynamic.tpr -mc maxclust.xvg -ac avcluste.xvg -nc nclust.xvg -cut 5  -n trjconv_stable.ndx  -pbc
+
+#### GemPi2kDa #### 
+Equil: 
+###./ equil ### 
+# Prepare Berendsen equilibration
+gmx grompp -f berendsen.mdp -c em_solvent.gro -p topol.top -o berendsen.tpr
+
+# Make Berendsen equilibration
+gmx mdrun -s berendsen.tpr -deffnm berendsen -v
+
+# Prepare Nose-Hoover equilibration
+gmx grompp -f nosehoover.mdp -c berendsen.gro -p topol.top -o nosehoover.tpr
+
+# Make Nose-Hoover equilibration
+gmx mdrun -s nosehoover.tpr -deffnm nosehoover -v
+
+(500000 steps byrd03 from 14:29-17:41)
+
+1.creat Alys/
+copy Prod/ into Alys/
+ping@jarre:~/ProDrug/GemPi2kDa/Alys
+cp -r Prod Alys
+###vi mapp.sh;  edit mapp.sh 
+seq 0 32 | gmx traj -f nosehoover.gro -s em_vaccum.tpr -oxt em_mapped.gro -n mapping.ndx -com -ng 33
+#seq 0 32 | gmx traj -f em_vaccum.xtc -s em_vaccum.tpr -oxt em_mapped.xtc -n mapping.ndx -com -ng 33
+gmx grompp -f 2kda_minim.mdp -c em_mapped.gro -p 2kda_mapped.top -o 2kda_mapped.tpr
+
+2.prepare for all the files:
+cp ~GemPi1kda/1kda_mapped.top 2kda_mapped.top
+cp ~GemPi1kda/1kda_minim.mdp 2kda_minim.mdp
+cp ~GemPi2kda/Setup/em_vaccum.tpr 
+cp  ../Setup/gempi2_inbox.gro nosehoover.gro
+
+3.run small script to check the mapping
+seq 0 32 | gmx traj -f nosehoover.gro -s em_vaccum.tpr -oxt em_mapped.gro -n mapping.ndx -ng 33 -com 
+
+vmd em_mapped.gro -f nosehoover.gro (compare the structure between all_tom model and mapped model)
+edit 2kda_mapped.itp (add 10 links into itp files, the order of atoms is not simple)
+
+seq 0 32 | gmx traj -f nosehoover.gro -s em_vaccum.tpr -oxt em_mapped.gro -n mapping.ndx -com -ng 33
+gmx grompp -f 2kda_minim.mdp -c em_mapped.gro -p 2kda_mapped.top -o 2kda_mapped.tpr
+
+4.creat Take/
+cp ~/ProDrug/GemPi1kDa/byrd03/octanol/Take6_ok/cg_octanol.gro 2kda_mapped.itp minim.mdp relax.mdp cg_md.mdp  cg_gemocta.top
+ 
+edit mono.sh
+#!/bin/bash
+cat em_mapped.gro cg_octanol.gro > cg_gemocta.gro
+
+edit cg_gemocta.gro cg_gemocta.top
+
+edit cgmd.sh
+### minimization ###
+gmx grompp -f minim.mdp -c cg_gemocta.gro -p cg_gemocta.top -o minim.tpr -maxwarn 10
+gmx mdrun -v -deffnm minim 
+
+
+### relax the trajectory in the same solvent ###
+gmx grompp -f relax.mdp -c minim.gro -p cg_gemocta.top -o relax.tpr
+gmx mdrun -v -deffnm relax
+
+### run MD simulation ###
+gmx grompp -f cg_md.mdp -c relax.gro -p cg_gemocta.top -o cg_md.tpr
+gmx mdrun -v -deffnm cg_md
+
+
+### 13.02.2020 ###
+increase the simulate time of GemPi1kda to 15 us
+cp dynamic4.tpr dynamic5.tpr
+gmx convert-tpr -s  dynamic5.tpr -o dynamic_10us.tpr -extend 5000000
+
+vi run_ProDrug.sh, and nohup ./run_ProDrug.sh &  (from 18.00)
+gmx mdrun -deffnm dynamic -cpi dynamic.cpt -s dynamic_10us.tpr -c dynamic_15µs.g
+ro -noappend
+tail nohup.out
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
