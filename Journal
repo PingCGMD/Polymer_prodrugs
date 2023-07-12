@@ -1,0 +1,6 @@
+######06/02/2020#######
+ping@jarre:~/ProDrug/GemPi1kDa/byrd03/solution/Gem24/trajectory/traj1
+gmx rms -f traj1_8.7us.xtc -s dynamic.tpr -o rmsd.xvg
+gmx trjconv -f traj1_8.7us.xtc -s dynamic.tpr -o traj1_8.7us.gro -pbc cluster
+export LD_LIBRARY_PATH="/home/ping/software/gromacs/lib:$LD_LIBRARY_PATH"
+seq 0 23 | g_aggregate -f traj1_8.7us.xtc -s dynamic.tpr -n trjconv_stable.ndx -oc clusters1.xvg -of frequencies1.xvg -os statistics1.xvg -dist 6 -ng 24

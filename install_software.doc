@@ -1,0 +1,32 @@
+Quick and dirty installation
+
+    Get the latest version of your C and C++ compilers.
+    Check that you have CMake version 3.4.3 or later.
+    Get and unpack the latest version of the GROMACS tarball.
+    Make a separate build directory and change to it.
+    Run cmake with the path to the source as an argument
+    Run make, make check, and make install
+    Source GMXRC to get access to GROMACS
+
+Or, as a sequence of commands to execute:
+
+tar xfz gromacs-2019.tar.gz
+cd gromacs-2019
+./configure -prefix=/home/ping/software/gromacs
+mkdir build
+cd build
+cmake .. -DGMX_BUILD_OWN_FFTW=ON -DREGRESSIONTEST_DOWNLOAD=ON -DCMAKE_INSTALL_PREFIX=/home/ping/software/gromacs
+make
+make check 
+sudo make install (or make install)
+source /home/ping/software/gromacs/bin/GMXRC
+
+gedit ~/.bashrc
+source ~/.bashrc
+
+
+
+for g_aggregate
+before use g_aggregate: export LD_LIBRARY_PATH="/home/ping/software/gromacs/lib:$LD_LIBRARY_PATH"
+after use g_aggregate, before start gmx, close this sheet 
+

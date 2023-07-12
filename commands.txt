@@ -1,0 +1,78 @@
+1  if open the file by chimera, we should delecte water molecules
+  grep -v HOH 1aki.pdb > 1AKI_clean.pdb
+
+2  generated three files (.gro topol.top posre.itp)
+  gmx pdb2gmx -f 1AKI_clean.pdb -o 1AKI_processed.gro -water spce
+  enter 15
+
+3  defined box 
+ gmx editconf -f 1AKI_processed.gro -o 1AKI_newbox.gro -c -d 1.0 -bt cubic
+ vmd 1AKI_newbox.gro   
+     pbc box
+
+4  fill the box with solvent
+ gmx solvate -cp 1AKI_newbox.gro -cs spc216.gro -o 1AKI_solv.gro -p topol.top
+ vmd 1AKI_solv.gro   
+     pbc box
+
+5  Add ions into the files
+ gmx grompp -f ions.mdp -c 1AKI_solv.gro -p topol.top -o ions.tpr
+ gmx genion -s ions.tpr -o 1AKI_solv_ions.gro -p topol.top -pname NA -nname CL -neutral
+ enter 13 (SOL)
+
+6 MD
+  Energy minimzation
+ gmx grompp -f minim.mdp -c 1AKI_solv_ions.gro -p topol.top -o em.tpr
+ gmx mdrun -v -deffnm em
+
+7 Potential analysis  
+  gmx energy -f em.edr -o potential.xvg
+  enter 10 0
+  more potential.xvg
+  xmgrace potential.xvg
+
+8 nvt simulation
+ gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr
+ gmx mdrun -deffnm nvt (run software)
+
+9 temperature analysis                                                                       
+ gmx energy -f nvt.edr -o temperature.xvg
+ 16 enter 0 
+ more temporature.xvg
+ xmgrace temperature.xvg
+
+10 npt simulation
+ gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
+ (change the step of npt.mdp)
+ gmx mdrun -deffnm npt (run software)
+
+11  Pressure analysis
+ gmx energy -f npt.edr -o pressure.xvg
+ enter 17 enter 0
+ more pressure.xvg
+ xmgrace pressure.xvg
+
+12  Density analysis
+ gmx energy -f npt.edr -o denisty.xvg
+ enter 23 enter 0
+ more denisty.xvg
+ xmgrace denisty.xvg
+
+13 Production MD
+ gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md_0_1.tpr
+ gmx mdrun -deffnm md_0_1
+or
+ gmx mdrun -deffnm md_0_1 -nb gpu
+
+14 analysis
+ gmx trjconv -s md_0_1.tpr -f md_0_1.xtc -o md_0_1_noPBC.xtc -pbc mol -center 
+ enter 1 enter 0
+
+ gmx rms -s md_0_1.tpr -f md_0_1_noPBC.xtc -o rmsd.xvg -tu ns 
+ enter 4 enter 0
+
+ gmx rms -s em.tpr -f md_0_1_noPBC.xtc -o rmsd_xtal.xvg -tu ns
+ enter 4 enter 0
+
+ gmx gyrate -s md_0_1.tpr -f md_0_1_noPBC.xtc -o gyrate.xvg
+ enter 1
