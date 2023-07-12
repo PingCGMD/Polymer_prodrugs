@@ -1,0 +1,12 @@
+title               =  energy minimization in solvent
+constraints         =  none
+integrator          =  steep
+nsteps              =  5000
+nstlist             =  1  
+ns_type             =  grid
+rlist               =  1.2
+rcoulomb            =  1.2
+rvdw                =  1.2
+pbc                 =  xyz
+emtol               =  500.0
+emstep              =  0.01

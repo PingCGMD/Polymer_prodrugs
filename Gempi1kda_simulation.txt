@@ -1,0 +1,668 @@
+MD simulation of GemPi1kda in water
+All-atom simulation
+1. Model
+Gempi1kda.cdx → gempi1kda_GMX.gro and gempi1kda_GMX.itp (gempi1kda.acpype)
+
+2. Setup
+### ./setup.sh ###
+# Place the solute in a simulation box
+gmx editconf -f gempi1kda_GMX.gro -bt cubic -d 1.4 -o gempi1_inbox.gro
+
+# Prepare minimization in vacuum
+gmx grompp -f em_vacuum.mdp -c gempi1_inbox.gro -p topol.top -o em_vacuum.tpr
+
+# Make minimization in vacuum 
+gmx mdrun -s em_vacuum.tpr -deffnm em_vacuum -v
+
+# Fill the box with water
+gmx solvate -cp em_vacuum.gro -cs spc216.gro -o gempi1_inslv.gro -p topol.top
+
+# Prepare the minimization in the solvent
+gmx grompp -f em_solvent.mdp -c gempi1_inslv.gro -p topol.top -o em_solvent.tpr
+
+# Make minimzation in the solvent
+gmx mdrun -s em_solvent.tpr -deffnm em_solvent -v
+
+3. Equil
+### ./equil.sh ###
+# Prepare Berendsen equilibration
+gmx grompp -f berendsen.mdp -c em_solvent.gro -p topol.top -o berendsen.tpr
+
+# Make Berendsen equilibration
+gmx mdrun -s berendsen.tpr -deffnm berendsen -v
+
+# Prepare Nose-Hoover equilibration
+gmx grompp -f nosehoover.mdp -c berendsen.gro -p topol.top -o nosehoover.tpr
+
+# Make Nose-Hoover equilibration
+gmx mdrun -s nosehoover.tpr -deffnm nosehoover -v
+
+4. Prod
+### nohup ./prod.sh & ###
+# Prepare production run
+gmx grompp -f md_prod.mdp -c nosehoover.gro -p topol.top -o md_prod.tpr
+
+# Make production run
+gmx mdrun -s md_prod.tpr -deffnm md_prod -v
+
+### ./rstr.sh ###
+# Restart production run
+gmx mdrun -s md_prod.tpr -deffnm md_prod -v -cpi md_prod.cpt
+
+5. Parametrizing a new molecule based on atomistic simulations
+a. Choose an atom-to-bead mapping, create mapping.ndx file 
+
+b. Put the GemPi1kda into the center of box and generated .gro and .xtc files
+#### ./extr.sh ###
+gmx trjconv -f nosehoover.gro -s md_prod.tpr -o md_solute.gro -center -pbc cluster
+
+gmx trjconv -f md_prod.xtc -s md_prod.tpr -o md_solute.xtc -center -pbc cluster
+
+c. Coarse-grain target atomistic data.
+Create a .itp index file with a directive for "[bonds]" containing (multiple) pairs of CG beads, "[angles]" containing triples and "[dihedrals]" quartets.
+          ### ./mapped.sh ###
+Seq 0 22 ∣gmx traj -f md_solute.gro -s md_solute.tpr -oxt md_mapped.gro -n mapping.ndx -com -ng 23
+Seq 0 22 ∣gmx traj -f md_solute.xtc -s md_solute.tpr -oxt md_mapped.xtc -n mapping.ndx -com -ng 23
+gmx grompp -f 1kda_minim.mdp -c md_mapped.gro -p 1kda_mapped.top -o 1kda_mapped.tpr
+
+d. Calculate the average and standard deviation for all the distributions (bond angle …)
+creat bonds.ndx and angles.ndx
+### ./bondanalysis.sh ###
+rm -rf BONDDISTRIBUTIONS
+mkdir  BONDDISTRIBUTIONS
+
+NBONDS=24
+
+IBOND=0
+while [ $IBOND -lt $NBONDS ]
+    do
+    echo $IBOND | gmx distance -f md_mapped.xtc -n bonds.ndx -s 1kda_mapped.tpr -oall BONDDISTRIBUTIONS/bond_$IBOND.xvg
+    gmx analyze -f BONDDISTRIBUTIONS/bond_$IBOND.xvg -dist BONDDISTRIBUTIONS/distr_$IBOND.xvg -bw 0.01
+    rm -rf \#*
+    let IBOND=$IBOND+1
+    done
+exit
+
+### ./angleanalysis.sh ###
+rm -rf ANGLEDISTRIBUTIONS
+mkdir  ANGLEDISTRIBUTIONS
+
+NANGLES=31
+
+IANGLE=0
+while [ $IANGLE -lt $NANGLES ]
+    do
+    echo $IANGLE | gmx angle -f md_mapped.xtc -n angles.ndx -type angle -ov ANGLEDISTRIBUTIONS/angle_$IANGLE.xvg
+    gmx analyze -f ANGLEDISTRIBUTIONS/angle_$IANGLE.xvg -dist ANGLEDISTRIBUTIONS/distr_$IANGLE.xvg -bw 1.0
+    rm -rf \#*
+    let IANGLE=$IANGLE+1
+    done
+exit
+
+6. CG simulation
+a. Create the CG itp file
+We can use the itp file of all-atom simulation
+b. Create CG simulation
+Mkdir Take1, run CG simulation
+### ./runcg.sh ###
+gmx grompp -f minim.mdp -c init_cg.gro -p 1kda_mapped.top -o minimization.tpr
+gmx mdrun -v -deffnm minimization
+
+gmx grompp -f relax.mdp -c minimization.gro -p 1kda_mapped.top -o relax.tpr
+gmx mdrun -v -deffnm relax
+
+gmx grompp -f cg_md.mdp -c relax.gro -p 1kda_mapped.top -o cg_md.tpr
+gmx mdrun -v -deffnm cg_md 
+c. Calculate the average and standard deviation for all the distributions
+### ./DOBONDANALYSIS.sh ###
+rm -rf BONDDISTRIBUTIONS
+mkdir  BONDDISTRIBUTIONS
+
+NBONDS=24
+
+IBOND=0
+while [ $IBOND -lt $NBONDS ]
+    do
+    echo $IBOND | gmx distance -f cg_md.xtc -n bonds.ndx -s cg_md.tpr -oall BONDDISTRIBUTIONS/bond_$IBOND.xvg
+    gmx analyze -f BONDDISTRIBUTIONS/bond_$IBOND.xvg -dist BONDDISTRIBUTIONS/distr_$IBOND.xvg -bw 0.01
+    rm -rf \#*
+    let IBOND=$IBOND+1
+    done
+sh
+exit
+
+### ./DOANGLEANALYSIS.sh ###
+rm -rf ANGLEDISTRIBUTIONS
+mkdir  ANGLEDISTRIBUTIONS
+
+NANGLES=31
+
+IANGLE=0
+while [ $IANGLE -lt $NANGLES ]
+    do
+    echo $IANGLE | gmx angle -f cg_md.xtc -n angles.ndx -type angle -ov ANGLEDISTRIBUTIONS/angle_$IANGLE.xvg
+    gmx analyze -f ANGLEDISTRIBUTIONS/angle_$IANGLE.xvg -dist ANGLEDISTRIBUTIONS/distr_$IANGLE.xvg -bw 1.0
+    rm -rf \#*
+    let IANGLE=$IANGLE+1
+    done
+
+exit
+
+d. Optimize CG bonded parameters
+Change the value of bond, angle 
+length (peak altitude, the higher the bigger value) 
+force (peak width, the more width the less value)
+e. Repeat ./runcg.sh until the value is more closed to the all-atom simulation
+
+
+
+
+
+MD simulation of GemPi1kda in octanol
+1. Model
+Gempi1kda.cdx → gempi1kda_GMX.gro and gempi1kda_GMX.itp (gempi1kda.acpype)
+octanol.cdx → octanol_GMX.gro and octanol_GMX.itp (octanol.acpype)
+need generate the gro and itp files of octanol
+
+2. Setup
+   ### ./setup.sh ###
+# Place the solute in a simulation box
+gmx editconf -f gempi1kda_GMX.gro -bt cubic -d 1.4 -o gempi1_inbox.gro
+
+# Prepare minimization in vacuum
+gmx grompp -f em_vacuum.mdp -c gempi1_inbox.gro -p topol.top -o em_vacuum.tpr
+
+# Make minimization in vacuum 
+gmx mdrun -s em_vacuum.tpr -deffnm em_vacuum -v
+
+# Fill the box with water
+gmx insert-molecules -f em_vacuum.gro -ci octanol_GMX.gro -o gempi1_inslv.gro -nmol 5000
+
+# Prepare the minimization in the solvent
+gmx grompp -f em_solvent.mdp -c gempi1_inslv.gro -p topol.top -o em_solvent.tpr
+
+# Make minimzation in the solvent
+gmx mdrun -s em_solvent.tpr -deffnm em_solvent -v
+
+3. Equil
+### ./equil.sh ###
+# Prepare Berendsen equilibration
+gmx grompp -f berendsen.mdp -c em_solvent.gro -p topol.top -o berendsen.tpr
+
+# Make Berendsen equilibration
+gmx mdrun -s berendsen.tpr -deffnm berendsen -v
+
+# Prepare Nose-Hoover equilibration
+gmx grompp -f nosehoover.mdp -c berendsen.gro -p topol.top -o nosehoover.tpr
+
+# Make Nose-Hoover equilibration
+gmx mdrun -s nosehoover.tpr -deffnm nosehoover -v
+
+4. Prod
+### ./prod.sh ###
+# Prepare production run
+gmx grompp -f md_prod.mdp -c nosehoover.gro -p topol.top -o md_prod.tpr
+
+# Make production run
+gmx mdrun -s md_prod.tpr -deffnm md_prod -v
+
+### ./rstr.sh ###
+# Restart production run
+gmx mdrun -s md_prod.tpr -deffnm md_prod -v -cpi md_prod.cpt
+
+5. Put the GemPi1kda into the center of box and generate .gro and .xtc files
+### ./estr.sh ###
+gmx convert-tpr -s md_prod.tpr -o md_solute.tpr
+
+gmx trjconv -f nosehoover.gro -s md_prod.tpr -o md_solute.gro -center -pbc cluster
+
+gmx trjconv -f md_prod.xtc -s md_prod.tpr -o md_solute.xtc -center -pbc cluster
+
+6. Coarse-grain target atomistic data.
+Create a .itp index file with a directive for "[bonds]" containing (multiple) pairs of CG beads, "[angles]" containing triples and "[dihedrals]" quartets.
+
+### ./mapp.sh ###
+seq 0 22 | gmx traj -f md_solute.gro -s md_solute.tpr -oxt md_mapped.gro -n mapping.ndx -com -ng 23
+
+seq 0 22 | gmx traj -f md_solute.xtc -s md_solute.tpr -oxt md_mapped.xtc -n mapping.ndx -com -ng 23
+
+gmx grompp -f 1kda_minim.mdp -c md_mapped.gro -p 1kda_mapped.top -o 1kda_mapped.tpr
+7. Calculate the average and standard deviation for all the distributions (bond, angle …)
+Creat bond.ndx and angle.ndx
+### ./bondanalysis.sh ###
+rm -rf BONDDISTRIBUTIONS
+mkdir  BONDDISTRIBUTIONS
+
+NBONDS=24
+
+IBOND=0
+while [ $IBOND -lt $NBONDS ]
+    do
+    echo $IBOND | gmx distance -f md_mapped.xtc -n bonds.ndx -s 1kda_mapped.tpr -o all BONDDISTRIBUTIONS/bond_$IBOND.xvg
+    gmx analyze -f BONDDISTRIBUTIONS/bond_$IBOND.xvg -dist BONDDISTRIBUTIONS/distr_$IBOND.xvg -bw 0.01
+    rm -rf \#*
+    let IBOND=$IBOND+1
+    done
+
+exit
+
+ ### ./angleanalysis.sh ###
+rm -rf ANGLEDISTRIBUTIONS
+mkdir  ANGLEDISTRIBUTIONS
+
+NANGLES=31
+
+IANGLE=0
+while [ $IANGLE -lt $NANGLES ]
+    do
+    echo $IANGLE | gmx angle -f md_mapped.xtc -n angles.ndx -type angle -ov ANGLEDISTRIBUTIONS/angle_$IANGLE.xvg
+    gmx analyze -f ANGLEDISTRIBUTIONS/angle_$IANGLE.xvg -dist ANGLEDISTRIBUTIONS/distr_$IANGLE.xvg -bw 1.0
+    rm -rf \#*
+    let IANGLE=$IANGLE+1
+    done
+
+exit
+
+6. CG simulation
+a. Create the CG itp file
+We can use the itp file of CG simulation in water
+b. Mapping Octanol beads and GemPi1kda beads
+For each octanol, there are 2 beads in one molecular
+### indexer.py ###
+#!/usr/bin/env python
+
+nmols = 1138     # Number of molecules
+atspermol = 9    # AA atoms per molecule
+beadspermol = 2  # CG beads per molecule
+firstbead = 4    # AA atoms in the first bead
+atsperbead = 4   # AA atoms per CG bead
+lastbead = 5     # AA atoms in the last bead
+
+outname = "mapping.ndx"  # Output filename
+
+with open(outname,'w') as NDX:
+    for mol in range(nmols):
+        for bead in range(beadspermol):
+
+            # The number of atoms (nats) might depend on whether it's a first,
+            # last, or middle bead. NDXs are 1-based
+            if bead==0:
+                nats = firstbead
+                startat = 1
+            elif bead==beadspermol-1:
+                nats = lastbead
+                startat = atspermol-lastbead+1
+            else:
+                nats = atsperbead
+                startat = (bead-1)*atsperbead + firstbead + 1
+
+            startat += mol*atspermol  
+            ats = range(startat, startat + nats) 
+            ats = " ".join(map(str, ats))
+            NDX.write("[ mol%dbead%d ]\n%s\n" % (mol+1,bead+1, ats))
+
+
+7. Mapping all the octanol beads into the gro file
+### ./mapp.sh ###
+seq 0 2275 | gmx traj -f octanolnoh.gro -s octanolnoh.gro -oxt cg_octanol.gro -n mapping.ndx -com -ng 2276
+where 2275 is the number of CG beads in your molecule and the 'seq 0 2274' avoids having to type all index groups. Inspect the file mapping.ndx to see how the atoms of toluene are grouped into the CG beads
+
+8. put cg_gempi1kda.gro and cg_octanol.gro into the same cg_gemocta.gro, and edit cg_gemocta.gro, detect the line between two files  
+### ./mono.sh ###
+#!/bin/bash
+cat cg_gempi1kda.gro cg_octanol.gro > cg_gemocta.gro
+edit cg_gemocta.gro
+
+9.  Create CG simulation
+Extract one frame from your mapped trajectory and solvate it in the same solvent as the atomistic simulation. Create a top file (include the general martini itp files and the newly created molecule itp and add the right number of molecules (solute and solvent))
+We can use the itp file of all-atom simulation in octanol
+### ./cgmd.sh ###
+### minimization ###
+gmx grompp -f minim.mdp -c cg_gemocta.gro -p cg_gemocta.top -o minim.tpr
+gmx mdrun -v -deffnm minim
+(if the atom is not cooperated, run the commands below)
+gmx grompp -f minim.mdp -c cg_gemocta.gro -p cg_gemocta.top -o minim.tpr -maxwarn 10)
+
+### relax the trajectory in the same solvent ###
+gmx grompp -f relax.mdp -c minim.gro -p cg_gemocta.top -o relax.tpr
+gmx mdrun -v -deffnm relax
+
+### run MD simulation ###
+gmx grompp -f cg_md.mdp -c relax.gro -p cg_gemocta.top -o cg_md.tpr
+gmx mdrun -v -deffnm cg_md
+
+10. Calculate the average and standard deviation for all the distributions
+### ./bondanalysis.sh ###
+### ./angleanalysis.sh ###
+
+
+11. Analyze the  bond distribution and angle distribution, change the value of itp files, repeat step 9 until get a good result. 
+
+After  we  get a good itp file, we use it to simulate  24 GemPi1kda in the box  to explore the aggregation of them.
+3. ProDrug-subject MAE abstract
+Coarse-grained MD simulation of GemPi1kda in solution (Water+150mM NaCl)
+
+Conditions:
+150mM NaCl + water 
+1mM ProDrug (1kda)
+325140 beads with Martini V2.1_dna FF
+1microsecond expected 
+
+1. Preparing step
+a. Here we used the optimised itp obtained from multiple coarsed-grained MD simulations of 1 GemPi1kda in octonol, here the selected parameters from simulation #6.(Copy cg_md.xtc and cg_md.tpr from ~/ProDrug/Octanol/Take11 )
+
+# GemPi1kda has been extract from the last frame ~ 5000 ps, choose #2 – non.
+gmx trjconv -f cg_md.xtc -s cg_md.tpr -o prodrug.gro -dump 5000
+
+( gmx trjconv -f cg_md.xtc -s cg_md.tpr -dump 700000 -o prodrug.gro )
+Choose the 70000 ps  as the start files
+
+b. Then using some unix routines, we replicate the chain until 24 polymers into the box. The box size has been fix at ~ 34.16nm for x,y,z dimensions for a concentration of  [ProDrug] at 1mM. 
+
+# Place the solute in a simulation box
+gmx editconf -f prodrug.gro -bt cubic -d 1 -o prodrug_inbox.gro
+
+# put additional 23 prodrug in the box
+gmx insert-molecules -f prodrug_inbox.gro  -ci prodrug.gro -o system0.gro -nmol 23 -box 32 32 32
+
+# define the size of box
+gmx editconf -f system0.gro -o system_temp.gro -d 1.0 -bt cubic -box 34.16 34.16 34.16
+
+2. Minimization steps
+# Minimization in vaccum following by minimization in solution
+gmx grompp -f minimization-vac.mdp -c system_temp.gro -p system.top -o minimization-vac.tpr
+gmx mdrun -deffnm minimization-vac -v
+
+# Solvatation
+gmx solvate -cp minimization-vac.gro -cs water.gro -radius 0.21 -o system_W.gro
+
+gmx grompp -f ions.mdp -c system_W.gro -p system_1.top -o ions.tpr
+
+# Add ions into the box
+gmx genion -s ions.tpr  -p system_2.top  -neutral -conc 0.15  -pname NA+ -nname CL- -o system_WI.gro -n ion.ndx
+Then select the water group, here it’s the #3.
+
+# minimization 
+gmx grompp -f minimization.mdp -c system_WI.gro -p system_2.top -o minimization.tpr
+gmx mdrun -deffnm minimization -v
+
+3. Equilibration and production step
+Set 50000 step for the equilibration following by 1µs of production 
+
+# Equil 
+gmx grompp -f equilibration.mdp -c minimization.gro -p system.top -o equilibration.tpr -n system.ndx
+gmx mdrun -deffnm equilibration -v
+
+# Prod
+gmx grompp -f dynamic.mdp -c equilibration.gro -p system.top -o dynamic.tpr -n system.ndx
+gmx mdrun -deffnm dynamic -v
+On byrd03 execute that:
+nohup ./run_ProDrug.sh > run_ProDrug.out & (4 days)
+
+4. Analyze
+a. After simulation finished, download the .xtc  .log  .gro files from byrd03
+if it was not the whole trajectory of prodrug, put them together:
+#gmx trjcat -f dynamic.xtc dynamic.part0002.xtc -o prodrug_traj1.xtc
+
+other script may be can use
+gmx check -f prodrug_traj1.xtc
+
+(Because of the disconnection of byrd03, a part of simulation worked in  Anne-elisabeth‘s computer, so the whole trajectory should be prodrug_traj1.xtc, the documents of  Anne-elisabeth download to traj2)
+
+b. Visualization of results
+graph  #xmgrace -nxy statistics.xvg
+analyze the number of clusters (blue) and the number of prodrug in the maximum cluster (red)
+
+wacth the movie. 
+###vmd equilibration.gro, open prodrug_traj1.xtc;
+
+c. Analyze the RMSD to proof whether the aggregation is stable. 
+Convergence is also checked in terms of the structure, through the root mean square deviation (RMSD) against the starting structure and the average structure
+#gmx rms -s dynamic.tpr -f prodrug_traj1.xtc -o rmsd_xta1.xvg
+#xmgrace rmsd_xta1.xvg
+
+#gmx rms -s dynamic.tpr -f prodrug_traj2.xtc -o rmsd_xtal2.xvg
+#xmgrace rmsd_xta1.xvg 
+
+d. Send prodrug_traj1.xtc and prodrug_traj2.xtc to Anne-elisabeth get clusters.xvg, frequencies.xvg, statistics.xvg
+script:
+
+seq 0 23 | g_aggregate -f prodrug_traj1.xtc -s dynamic.tpr -n index.ndx -oc clusters1.xvg -of frequencies1.xvg -os statistics1.xvg -dist 6 -ng 24
+then compare the results of movie (VMD) and graph (xmgrace)
+
+###gmx clustsize -f traj1_8.7us.xtc -s dynamic.tpr -mc maxclust.xvg -ac avcluste.xvg -nc nclust.xvg -cut 5  -n trjconv_stable.ndx  -pbc
+
+5. increase the simulation to 5 macroseconds
+1. Preparation 
+a, motified the nstep in dynamic.mdp, change 50000000 to 250000000
+
+b. Copy dynamic.cpt to dynamic0.cpt
+dynamic.tpr to dynamic0.tpr
+run_ProDrug.out to run_ProDrug0.out
+
+c, run script ###run_ProDrug.sh
+###run_ProDrug.sh###
+gmx mdrun -deffnm dynamic -cpi dynamic.cpt -s dynamic.tpr -c dynamic_5µs.gro -noappend
+commands: nohup ./run_ProDrug.sh > run_ProDrug.out&
+
+6. increase the simulation to 10 macroseconds
+
+1,Preparation (on the base of 5 us)
+a, motified the nstep in dynamic.mdp, change 250000000 to 500000000
+
+b, copy dynamic.cpt to dynamic3.cpt
+dynamic.tpr to dynamic3.tpr
+run_ProDrug.out to run_ProDrug3.out
+
+c. another method is to edit new tpr file 
+① #gmx conv-tpr -f dynamic3.tpr -o dynamic.tpr -extend  250000000 
+②run the run_ProDrug.sh
+###run_ProDrug.sh###
+gmx mdrun -deffnm dynamic -cpi dynamic.cpt -s dynamic.tpr -c dynamic_10µs.gro -noappend
+commands: nohup ./run_ProDrug.sh > run_ProDrug.out&
+
+d. check the similation
+check the finished time: tail run_ProDrug.out
+check the simulate process: tail -f dynamic.part0003.log 
+
+7. Further Analyze
+a. Choose the stable time, cut it to generate a new .gro file in the same box
+gmx trjconv -f traj2_10us.xtc -s dynamic.tpr -tu us -b 7.0 -e 10.0 -o traj2_10us.gro -pbc cluster
+
+b. Gerated the index.ndx file of the biggest aggregation
+gmx make_ndx -f trjconv_stable.gro -o traj1.ndx
+--a 24-46 | a 47-69 | a 93-115 | a 139-161 | a 323-345 | a 346-368 | a 392-414 | a 507-529 | a 530-552
+--name 3 cluster1
+--a 24-29
+name 3 Gem1
+--a 47-69
+name 4 Gem2
+--a 93-115
+name 5 Gem3
+--a 139-161
+
+--a 323-345 
+
+--a 346-368
+
+--a 392-414
+
+--a 507-529 
+
+--a 530-552
+
+c. generate the .xtc .gro fles of center of mass of Cluster1 ((not necessary)
+gmx trjconv -f trjconv.gro -s dynamic.tpr -n trjconv ndx -o trjconv_cluster1.xtc -pbc whole 
+gmx trjconv -f  trjconv.gro -s dynamic.tpr -n trjconv.ndx -o trjconv_cluster1.gro -pbc whole
+
+gmx trjconv -f  traj1_5us.xtc -s dynamic.tpr -n traj1.ndx -o whole1.gro -pbc whole
+
+d. calculate the distance between the center of mass of aggregation and each of Gems (not necessary, it will be generated in the process of next step) 
+   gmx traj -f trajout.xtc -s trajout.grodynamic.tpr -n traj_Gem.ndx -oxt coord.xtc -ox coord.xvg -com
+   gmx traj -f trajout.xtc -s trajout.gro -n traj_Gem.ndx -oxt coord.gro -com
+
+seq 6 29 | gmx traj -f traj1.7us.xtc -s cluster_1.7us.tpr -n traj1.7us.ndx -oxt COM_Gem.gro -com -ng 24
+
+seq 54 77 | gmx traj -f traj1.7us.xtc -s cluster_1.7us.tpr -n traj1.7us.ndx -oxt COM_End.gro -com -ng 24
+
+
+
+gmx traj -f traj1.7us.xtc -s cluster_1.7us.tpr -n traj1.7us.ndx -oxt COM_cluster.gro -com
+
+
+
+e. Calculate the distance as function of time between the center of mass of aggregation and each of Gems
+one method 
+gmx pairdist -f trjconv.gro -s trjconv.gro -n COM.ndx -o trjconv_pairdist.xvg -ref "com of group 0" -sel "com of group 1"
+
+another method 
+gmx pairdist -f trjconv_stable.gro -s cluster.tpr -n trjconv_stable.ndx -o Gem_pairdist.xvg -selrpos whole_mol_com -seltype mol_com -pbc yes
+
+#3, #7 8 9 10 ...(generate whole.xvg files)
+
+gmx pairdist -f whole1.gro -s prodrug.tpr -n traj1.ndx -o Gem_pairdist_whole.xvg -selrpos whole_mol_com -seltype mol_com -pbc yes
+
+to make sure if the result is correctgmx gyrate -s trjconv_stable.gro -f trjconv_stable.gro -o gyrate1.xvg -n trjconv_stable.ndx
+use cp trjconv_cluster.gro trjconv_cluster0.gro
+vi trjconv_cluster0.gro
+chimera trjconv_cluster0.gro to calculate the distance between center of mass of cluster1 and Gem1 in one time, to make sure if it a good result.
+
+f. Calculate the Radius of gyration of a molecule
+one method
+gmx gyrate -s trjconv_stable.gro -f trjconv_stable.gro -o gyrate1.xvg -n trjconv_stable.ndx
+
+gmx gyrate -s whole1.gro -f whole1.gro -o gyrate_whole.xvg -n traj1.ndx
+
+another method
+gmx convert-tpr -s dynamic.tpr -o cluster.tpr
+gmx gyrate -f trjconv_stable.gro -s cluster.tpr -n  trjconv_stable.ndx -o gyrate1.xvg
+
+g. Calculate the Radius disterbution of Gem. Link. End
+gmx rdf -f trjconv_stable.gro -s cluster.tpr -n trjconv_stable.ndx -pbc yes -selrpos whole_mol_com -seltype mol_com -bin 0.05 -o rdf_End.xvg
+
+# 3 , # all the group of Gem. Link. End
+or
+vi Gem-----edit the reference group, like 2
+seq 30 53 >> Gem; put the calculate group in to Gem; like Gem group from 30 to 53
+cat Gem | gmx rdf -f traj2_fin.xtc -s traj2_fin.tpr -n traj2.ndx -pbc yes -selrpos whole_mol_com -seltype mol_com -bin 0.05 -o Gem.xvg
+
+h. Analyze the distribution of all the Gem in the same group (how to output the clump to draw the figure)
+#cp part4_rdf_Gem_mol.xvg part4_rdf_Gem_mol.dat
+#vi part4_rdf_Gem_mol.dat
+
+Read the values of columns from 2nd to 17th in rdf_Gem.dat
+awk '{print ($2+$3+$4+$5+$6+$7+$8+$9+$10+$11+$12+$13+$14+$15+$16+$17+$18+$19+$20+$21+$22+$23+$24+$25)}' rdf_Gem.dat
+
+Calculate the average value of columns from 2nd to 17th , then output into rdf_gem_average.dat
+awk '{print ($2+$3+$4+$5+$6+$7+$8+$9+$10+$11+$12+$13+$14+$15+$16+$17+$18+$19+$20+$21+$22+$23+$24+$25)/24}' rdf_Gem.dat > rdf_Gem_average.dat
+
+output the value of 1st columns to rdf_gem_dist.dat
+awk '{print $1}' part4_rdf_Gem_mol.dat  > rdf_gem_dist.dat
+
+check the columns of two files
+wc -l rdf_End_average.dat rdf_End_dist.dat
+
+combine two .dat files into one .dat file 
+paste rdf_End_dist.dat rdf_End_average.dat > rdf_End_dist_average.dat
+
+open the file, check the results
+xmgrace rdf_gem_dist_average.dat
+
+gmx trjconv -f prodrug_traj2.xtc -s ../traj5/dynamic.tpr -o trjconv.gro -pbc whole
+gmx trjconv -f prodrug_traj2.xtc -s ../traj5/dynamic.tpr -tu us -b 1.7 -e 3.8 -o trjconv_stable.gro -pbc cluster
+
+gmx make_ndx -f trjconv_stable.gro -o trjconv_stable.ndx
+
+gmx make_ndx -f trjconv_stable.gro -o trjconv_stable0.ndx
+edit trjconv_stable.gro:  vi trjconv_stable.gro
+
+gmx pairdist -f trjconv_stable.gro -s trjconv_stable.gro -n trjconv_stable.ndx -o 1.xvg -ref "com of group 3" -sel "com of group 6"
+
+## gmx pairdist -f trjconv_stable.gro -s cluster.tpr -n trjconv_stable.ndx -o Gem_pairdist.xvg -seltype mol_com -pbc yes
+
+gmx convert-tpr -s ../traj5/dynamic.tpr -o cluster.tpr
+## gmx gyrate -f trjconv_stable.gro -s cluster.tpr -n  trjconv_stable.ndx -o gyrate1.xvg
+
+gmx gyrate -s trjconv_stable.gro -f trjconv_stable.gro -o gyrate1.xvg -n trjconv_stable.ndx
+
+gmx gyrate -s trjconv_stable.gro -f prodrug_traj2.xtc -o gyrate3.xvg -n trjconv_stable.ndx
+
+gmx gyrate -s ../traj5/dynamic.tpr -f prodrug_traj2.xtc -o gyrate4.xvg -n trjconv_stable.ndx
+
+gmx pairdist -f trjconv_stable.gro -s cluster.tpr -n trjconv_stable.ndx -o End_pairdist.xvg -seltype mol_com -pbc yes
+
+gmx rdf -f trjconv_stable.gro -s cluster.tpr -n trjconv_stable.ndx -pbc yes -seltype mol_com -bin 0.05 -o rdf_End.xvg
+
+###################### 29/01/2020 ################################
+traj1:  10 us 
+dynamic.part0005
+
+End at 28/01 12:41
+start : cp dynamic.tpr dynamic4.tpr
+gmx mdrun -deffnm dynamic -cpi dynamic_prev.cpt -s dynamic.tpr -c dynamic_10µs.gro -noappend
+dynamic.part0006.log
+delect dynamic.part0006.log
+
+start : 
+gmx mdrun -deffnm dynamic -cpi dynamic.cpt -s dynamic4.tpr -c dynamic_10µs.gro -noappend
+dynamic.part0007.log
+
+05/02/2020
+nohup ./run_ProDrug.sh > run_ProDrug.out &
+dynamic.part0008.log
+
+
+
+
+traj2: 10 us
+dynamic.part0004
+
+
+
+
+
+
+Analysis
+ping@jarre:~/ProDrug/GemPi1kDa/byrd03/solution/Gem24/trajectory/traj1/test/
+gmx mindist -f traj1_fin.xtc -s traj1_fin.tpr -n traj1.ndx -on dist_mindist.xvg
+
+or 
+
+gmx pairdist -f traj1_fin.xtc -s traj1_fin.tpr -n traj1.ndx -o dist5.xvg -selrpos atom  -seltype atom
+
+
+gmx distance -f traj1_fin.xtc -s traj1_fin.tpr -n traj1.ndx -oall dist_distance.xvg -selrpos atom  -seltype atom
+
+ creat Gem.sh
+#!/bin/bash
+
+rm -rf GEMDISTRIBUTIONS
+mkdir  GEMDISTRIBUTIONS
+rm -rf GEMDAT
+mkdir  GEMDAT
+
+NGEM=29
+
+IGEM=6
+
+while [ $IGEM -lt $NGEM ]
+    do
+    seq $IGEM 29 >> GEMDAT/gem_$IGEM.dat
+    cat GEMDAT/gem_$IGEM.dat | gmx pairdist -f traj1_fin.xtc -s traj1_fin.tpr -n traj1.ndx -o GEMDISTRIBUTIONS/GEM_$IGEM.xvg -selrpos atom -seltype atom
+    
+        rm -rf \#*
+    let IGEM=$IGEM+1
+    done
+
+exit
+
+
+
+
+
+
+
+
+
+
+
