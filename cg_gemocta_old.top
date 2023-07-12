@@ -1,0 +1,13 @@
+; Include forcefield parameters
+#include "./martini_v2.1-dna.itp"
+#include "./martini_v2.0_solvents.itp"
+#include "./1kda_mapped.itp"
+
+[ system ]
+; Name
+gempi1kda in biphasic w/octanol
+
+[ molecules ]
+; Compound       #mols
+gempi1kda         1
+OCO            1138

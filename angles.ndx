@@ -1,0 +1,62 @@
+[ angle0 ]
+ 1  2  3
+[ angle1 ]
+ 2  3  1
+[ angle2 ]
+ 3  1  2
+[ angle3 ]
+ 1  3  4 
+[ angle4 ]
+ 2  3  4 
+[ angle5 ]
+ 3  4  5
+[ angle6 ]
+ 3  4  6
+[ angle7 ]
+ 4  5  6 
+[ angle8 ]
+ 4  6  5
+[ angle9 ]
+ 5  4  6
+[ angle10 ]
+ 4  6  7
+[ angle11 ]
+ 5  6  7
+[ angle12 ]
+ 6  7  8
+[ angle13 ]
+ 7  8  9
+[ angle14 ]
+ 8  9  10
+[ angle15 ]
+ 9  10  11
+[ angle16 ]
+ 10  11  12
+[ angle17 ]
+ 11  12  13
+[ angle18 ]
+ 12  13  14
+[ angle19 ]
+ 13  14  15
+[ angle20 ]
+ 14  15  16
+[ angle21 ]
+ 15  16  17
+[ angle22 ]
+ 17  18  19
+[ angle23 ]
+ 17  18  20
+[ angle24 ]
+ 17  18  21
+[ angle25 ]
+ 19  18  20
+[ angle26 ]
+ 19  18  21
+[ angle27 ]
+ 20  18  21
+[ angle28 ]
+ 18  21  22
+[ angle29 ]
+ 18  21  23
+[ angle30 ]
+ 22  21  23
